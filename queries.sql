@@ -119,6 +119,8 @@ GROUP BY game.id, game.mdate;
 
 -- QUESTION 13 -> List every match with the goals scored by each team as shown. This will use "CASE WHEN" which has not been explained in any previous exercises.
 
+--note: the sql statement below produces a table that is missing two rows (compared to SQLZOO's answser) because of the INNER JOIN in the SQL statement. An INNER JOIN only returns rows where there is a match in both tables. In this case, if a game has no corresponding goals in the 'goal' table (i.e., a game ended with a score of 0-0), it will not be included in the result set.
+
 SELECT game.mdate, game.team1, 
        SUM(CASE WHEN goal.teamid = game.team1 THEN 1 ELSE 0 END) as score1, 
        game.team2, 
@@ -128,4 +130,182 @@ JOIN goal ON game.id = goal.matchid
 GROUP BY game.mdate, game.team1, game.team2
 ORDER BY game.mdate, game.id, game.team1, game.team2;
 
+--To include games that ended with a score of 0-0, you should use a LEFT JOIN instead. This type of join returns all the rows from the 'game' table, and the matched rows from the 'goal' table. If there is no match, the result is NULL on the 'goal' side.
+
+SELECT game.mdate, game.team1, 
+       COALESCE(SUM(CASE WHEN goal.teamid = game.team1 THEN 1 ELSE 0 END), 0) as score1, 
+       game.team2, 
+       COALESCE(SUM(CASE WHEN goal.teamid = game.team2 THEN 1 ELSE 0 END), 0) as score2
+FROM game
+LEFT JOIN goal ON game.id = goal.matchid
+GROUP BY game.mdate, game.team1, game.team2
+ORDER BY game.mdate, game.id, game.team1, game.team2;
+
+--note: The COALESCE function is used to handle NULL values that may result from the LEFT JOIN. It returns the first non-NULL value in the list. In this case, if the SUM function returns NULL (which means there were no goals for a team in a particular game), COALESCE will return 0.
+
 --TUTORIAL 7 MORE JOINS
+
+--1. List the films where the yr is 1962 [Show id, title]
+SELECT id, title
+ FROM movie
+ WHERE yr=1962;
+
+--2. Give year of 'Citizen Kane'.
+SELECT yr
+ FROM movie
+ WHERE title='Citizen Kane';
+
+--3. List all of the Star Trek movies, include the id, title and yr (all of these movies include the words Star Trek in the title). Order results by year.
+
+SELECT id, title, yr
+ FROM movie
+ WHERE title like '%star% %trek%'
+order by yr;
+
+--4. What id number does the actor 'Glenn Close' have?
+
+select id from actor where name = 'Glenn Close';
+
+--5. What is the id of the film 'Casablanca'
+select id from movie where title = 'Casablanca';
+
+--6. Obtain the cast list for 'Casablanca'.  what is a cast list?  The cast list is the names of the actors who were in the movie.  Use movieid=11768, (or whatever value you got from the previous question).  Submit SQLrestore default.
+
+SELECT actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE movie.title = 'Casablanca';
+
+--note: how to methodically solve this problem:
+
+--step one: Identify the tables you need to join. In this case, you need data from the movie, actor, and casting tables.
+------(a)  The movie table contains information about movies, including their titles. You need this table to find the movie 'Casablanca'.
+------(b)  The actor table contains information about actors, including their names. You need this table to get the names of the actors.
+------(c)  However, neither of these tables directly links movies to actors. This is where the casting table comes in. It serves as a bridge between the movie and actor tables, linking them via the movieid and actorid fields.
+
+--step two: Identify the common keys between the tables. The `movie` table and the `casting` table can be joined on `movie.id` and `casting.movieid`. The `actor` table and the `casting` table can be joined on `actor.id` and `casting.actorid`.  Keep in mind that the casting table is an example of a "junction table" or "bridge table". It connects two other tables in a many-to-many relationship.
+
+--step three: Identify the fields you need in your final result. You need the `name` field from the `actor` table.
+
+--step four: Construct the SQL statement. Start with the `SELECT` clause, then add the `FROM` clause with the necessary `JOIN` operations, and finally add the `WHERE` clause to filter for 'Casablanca'.
+
+SELECT actor.name
+FROM actor
+JOIN casting ON actor.id = casting.actorid
+JOIN movie ON casting.movieid = movie.id
+WHERE movie.title = 'Casablanca';
+
+--note on optimization: The performance of a SQL query can depend on a variety of factors, including the database management system (DBMS), the size of the tables, the distribution of data, the indexes available, and the specific implementation of the JOIN operation.
+
+-- In general, starting the JOIN operation with the table that reduces the result set the most can improve performance. This is because fewer rows need to be processed in subsequent operations.
+
+-- In your case, if there are many more rows in the actor table than in the movie table, and only a few of them are in 'Casablanca', starting with the movie table might be more efficient. This is because the WHERE clause can filter out the rows not related to 'Casablanca' early in the process.
+
+-- On the other hand, if there are many more rows in the movie table than in the actor table, and most actors are in 'Casablanca', starting with the actor table might be more efficient.
+
+-- However, modern DBMSs have query optimizers that can rearrange the operations in a query to achieve the most efficient execution plan, regardless of the order in which you write the JOIN operations. So, in practice, the order of tables in your query might not significantly affect performance.
+
+-- To truly determine which query is more performant, you would need to run both queries on your specific DBMS and measure the execution time and resource usage.
+
+--7. Obtain the cast list for the film 'Alien'
+
+SELECT actor.name
+FROM actor
+JOIN casting ON actor.id = casting.actorid
+JOIN movie ON casting.movieid = movie.id
+WHERE movie.title = 'Alien';
+
+-- or 
+
+SELECT actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE movie.title = 'Alien';
+
+--8. List the films in which 'Harrison Ford' has appeared
+
+SELECT movie.title
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE actor.name = 'Harrison Ford';
+
+--9. List the films where 'Harrison Ford' has appeared - but not in the starring role. [Note: the ord field of casting gives the position of the actor. If ord=1 then this actor is in the starring role]
+
+SELECT movie.title
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE actor.name = 'Harrison Ford' and ord <> 1;
+
+--10. List the films together with the leading star for all 1962 films.
+
+SELECT movie.title, actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE movie.yr = 1962 and casting.ord = 1;
+
+--11. Which were the busiest years for 'Rock Hudson', show the year and the number of movies he made each year for any year in which he made more than 2 movies.
+
+SELECT yr, COUNT(movie.title) 
+FROM movie 
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE name='Rock Hudson'
+GROUP BY yr
+HAVING COUNT(title) > 2;
+
+--12. List the film title and the leading actor for all of the films 'Julie Andrews' played in.
+
+SELECT movie.title, actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE casting.ord = 1 AND movie.id IN (
+    SELECT movie.id
+    FROM movie
+    JOIN casting ON movie.id = casting.movieid
+    JOIN actor ON casting.actorid = actor.id
+    WHERE actor.name = 'Julie Andrews'
+);
+
+--note: the subquery SELECT movie.id FROM movie JOIN casting ON movie.id = casting.movieid JOIN actor ON casting.actorid = actor.id WHERE actor.name = 'Julie Andrews' gets the IDs of all movies in which 'Julie Andrews' appeared. The IN operator in the main query then checks if a movie's ID is in this list of IDs. If it is, the main query retrieves the title of the movie and the name of the leading actor (where casting.ord = 1).
+
+--13. Obtain a list, in alphabetical order, of actors who've had at least 30 starring roles.
+
+SELECT actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE casting.ord = 1
+GROUP BY actor.name
+HAVING COUNT(casting.movieid) >= 15
+ORDER BY actor.name ASC;
+
+--14. List the films released in the year 1978 ordered by the number of actors in the cast, then by title.
+
+SELECT movie.title, COUNT(casting.actorid) as num_actors
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+WHERE movie.yr = 1978
+GROUP BY movie.title
+ORDER BY num_actors DESC, movie.title ASC;
+
+--15. List all the people who have worked with 'Art Garfunkel'.
+
+--note: In this query, the subquery "SELECT movie.id FROM movie JOIN casting ON movie.id = casting.movieid JOIN actor ON casting.actorid = actor.id WHERE actor.name = 'Art Garfunkel'" gets the IDs of all movies in which 'Art Garfunkel' appeared. The 'IN' operator in the main query then checks if a movie's ID is in this list of IDs. If it is, the main query retrieves the names of all actors in that movie. The final condition "actor.name != 'Art Garfunkel'"" ensures that 'Art Garfunkel' is not included in the list of people who have worked with him.
+
+SELECT actor.name
+FROM movie
+JOIN casting ON movie.id = casting.movieid
+JOIN actor ON casting.actorid = actor.id
+WHERE movie.id IN (
+    SELECT movie.id
+    FROM movie
+    JOIN casting ON movie.id = casting.movieid
+    JOIN actor ON casting.actorid = actor.id
+    WHERE actor.name = 'Art Garfunkel'
+) AND actor.name != 'Art Garfunkel';
